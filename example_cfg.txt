@@ -1,0 +1,14 @@
+{
+  #supports line comment
+  "e_raten" : 0b1, #binary int
+  "e_rate"  : 100000000.0, #real
+  "psc_vld" : 0xff, #hexadecimal int
+  "pfe_per_oq" : {
+    0 : [0,1,2,3], #integer indices and array literal
+    1 : [4,5,6,7],
+    3 : [1,2,3,4],
+  }, #Nested objects
+  "name": "A string value", 
+  # Depending on the first Key, the type will be determined
+  0xff  : "The key here will be interpreted as a string",
+}
