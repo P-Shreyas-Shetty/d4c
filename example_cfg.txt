@@ -9,6 +9,6 @@
     3 : [1,2,3,4],
   }, #Nested objects
   "name": "A string value", 
-  # Depending on the first Key, the type will be determined
-  0xff  : "The key here will be interpreted as a string",
+  
+  0xff  : "hello there!!",
 }
