@@ -7,17 +7,16 @@ import d4c::*;
 // Test data
   /*
 {
-  #supports line comment
-  "e_raten" : 0b1, #binary int
+  "e_raten" : 0b1, #int
   "e_rate"  : 100_000_000.0, #real
-  "psc_vld" : 0xff, #hexadecimal int
+  "psc_vld" : 0xff, 
   "pfe_per_oq" : {
     0 : [0,1,2,3], #integer indices and array literal
     1 : [4,5,6,7],
     3 : [1,2,3,4],
   }, #Nested objects
   "name": "A string value", 
-  # Depending on the first Key, the type will be determined
+  # This will get ignored
   0xff  : "The key here will be interpreted as a string",
 }
 */
@@ -46,7 +45,7 @@ module d4c_test;
     string line;
     d4c_int_map#(.KEY(int), .VAL(d4c_array#(d4c_int#(int)))) parsed = new("obj");
     CustomClass cc = new("cc");
-    fd = $fopen("example_dict_of_array.cfg", "r");
+    fd = $fopen("example_dict_of_array.txt", "r");
     while($fgets(line, fd)) begin
       content = { content, line };
     end
@@ -57,7 +56,7 @@ module d4c_test;
     $display("Parse done");
     $display("%s", parsed.to_string());
     
-    fd = $fopen("example_cfg.d4c", "r");
+   fd = $fopen("example_cfg.txt", "r");
     while($fgets(line, fd)) begin
       file2 = { file2, line };
     end
