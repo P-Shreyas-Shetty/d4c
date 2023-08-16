@@ -1,9 +1,9 @@
 {
   #supports line comment
-  "e_raten" : 0b1, #binary int
-  "e_rate"  : 100000000.0, #real
-  "psc_vld" : 0xff, #hexadecimal int
-  "pfe_per_oq" : {
+  "en" : 0b1, #binary int
+  "rate"  : 100000000.0, #real
+  "l_vld" : 0xff, #hexadecimal int
+  "m_per_n" : {
     0 : [0,1,2,3], #integer indices and array literal
     1 : [4,5,6,7],
     3 : [1,2,3,4],
