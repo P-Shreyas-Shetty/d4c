@@ -34,7 +34,7 @@
         function new(string name);                                             \
           super.new(name);                                                     \
         endfunction                                                            \
-        virtual function void parse_from_syntree(d4c_syntree_base node);       \
+        virtual function void parse_from_syntree(d4c_syntree_base node, input d4c_syn_param_t syn_param=D4C_CFG_FILE_SYN);       \
           d4c_syntree_map node_map;                                            \
           if(node.ty!=MAP) begin                                               \
             `uvm_fatal(get_name(), $psprintf("Expected Map at %s", node.pos))  \
@@ -52,7 +52,7 @@
           end                                                                       \
           else begin                                                                \
             __d4c_field = new($psprintf("%s.%0s", get_name(), `"__d4c_field`"));    \
-            __d4c_field.parse_from_syntree(node_map.val[`"__d4c_field`"].v);        \
+            __d4c_field.parse_from_syntree(node_map.val[`"__d4c_field`"].v, .syn_param(syn_param));        \
           end                                                                       \
           string_builder.params[`"__d4c_field`"] = __d4c_field; 
 
@@ -69,6 +69,15 @@ package d4c;
   `include "uvm_macros.svh"
   import uvm_pkg::*;
 
+  // defining syntax.
+  // syntax is configrable, we can set any character 
+  // as seperator or as brackets
+  // I have chosen mostly  a json like syntax for cfg file
+  // but these same syntax might not work exactly when used as
+  // UVM set_config_string
+  // I have defined two sets of syntax params, one for cfg file
+  // and one for command line friendliness. Howver, user
+  // is free to write his own set of syntax symbols
   parameter byte SEP0 = ",";
   parameter byte SEP1 = ":";
   parameter byte OPEN_ARRAY = "[";
@@ -76,6 +85,7 @@ package d4c;
   parameter byte OPEN_MAP = "{";
   parameter byte CLOSE_MAP = "}";
   
+  //syntax param struct to define your own syntax
   typedef struct {
     byte sep0;
     byte sep1;
@@ -83,10 +93,28 @@ package d4c;
     byte close_array;
     byte open_map;
     byte close_map;
-  } d4c_syntax_param_t;
+  } d4c_syn_param_t;
+
+  //predefined syntax struct for cfg files
+  //defined with this, cfg file will look like: {foo: [1,2,3], bar:[2,3,4]}
+  parameter d4c_syn_param_t D4C_CFG_FILE_SYN = '{
+    SEP0, 
+    SEP1,
+    OPEN_ARRAY,
+    CLOSE_ARRAY,
+    OPEN_MAP,
+    CLOSE_MAP
+  };
+
+  //predefined syntax struct that is command line friendly
+  //defined with this, arg will look like: [foo-<1:2:3>:bar-<2:3:4>]
+  parameter d4c_syn_param_t D4C_CMD_ARG_SYN = '{
+     ":", "-", "<", ">", "[", "]"
+  };
 
   
-  //typedef int unsigned ptr_t ;
+  // this is an internal implentation detail
+  // not visible outside
   typedef enum {MAP, ARRAY, VAL} node_t;
 
   // ptr_t: This class is used to keep track of line and pos
@@ -159,7 +187,7 @@ package d4c;
       end
     endfunction
 
-    extern virtual function d4c_syntree_base parse(ref string raw_str, ref ptr_t ptr, input string name, input bit is_key=0);
+    extern virtual function d4c_syntree_base parse(ref string raw_str, ref ptr_t ptr, input string name, input bit is_key=0, input d4c_syn_param_t syn_param=D4C_CFG_FILE_SYN);
 
     virtual function string to_string(int indent=0);
     endfunction
@@ -177,7 +205,7 @@ package d4c;
       ty  = VAL;
     endfunction
 
-    extern function d4c_syntree_base parse(ref string raw_str, ref ptr_t ptr, input string name, input bit is_key=0); 
+    extern function d4c_syntree_base parse(ref string raw_str, ref ptr_t ptr, input string name, input bit is_key=0, input d4c_syn_param_t syn_param=D4C_CFG_FILE_SYN); 
     
     virtual function string to_string(int indent=0);
       return $psprintf("%sVAL{%s}", {indent{"  "}}, val); 
@@ -192,7 +220,7 @@ package d4c;
       ty  = ARRAY;
     endfunction
 
-    extern function d4c_syntree_base parse(ref string raw_str, ref ptr_t ptr, input string name, input bit is_key=0); 
+    extern function d4c_syntree_base parse(ref string raw_str, ref ptr_t ptr, input string name, input bit is_key=0, input d4c_syn_param_t syn_param=D4C_CFG_FILE_SYN); 
 
     function string to_string(int indent=0);
       string s = $psprintf("%s%s\n", {indent{"  "}}, OPEN_ARRAY);
@@ -212,7 +240,7 @@ package d4c;
       ty  = MAP;
     endfunction
 
-    extern function d4c_syntree_base parse(ref string raw_str, ref ptr_t ptr, input string name, input bit is_key=0);
+    extern function d4c_syntree_base parse(ref string raw_str, ref ptr_t ptr, input string name, input bit is_key=0, input d4c_syn_param_t syn_param=D4C_CFG_FILE_SYN);
 
     function string to_string(int indent=0);
       string s = $psprintf("%s%s\n", {indent{"  "}}, OPEN_MAP);
@@ -225,32 +253,32 @@ package d4c;
     endfunction
   endclass
 
-  function d4c_syntree_base d4c_syntree_base::parse(ref string raw_str, ref ptr_t ptr, input string name, input bit is_key=0);
+  function d4c_syntree_base d4c_syntree_base::parse(ref string raw_str, ref ptr_t ptr, input string name, input bit is_key=0, input d4c_syn_param_t syn_param=D4C_CFG_FILE_SYN);
     d4c_syntree_base::skip_ws_cmt(raw_str, ptr);
     if(raw_str.len() == 0) `uvm_fatal(name, "Unexpected EOF") 
     if(raw_str[ptr.p]=="\"") begin
       d4c_syntree_val v = new();
-      void'(v.parse(raw_str, ptr, name));
+      void'(v.parse(raw_str, ptr, name, .syn_param(syn_param)));
       return v;
     end
-    else if(raw_str[ptr.p]==OPEN_ARRAY) begin
+    else if(raw_str[ptr.p]==syn_param.open_array) begin
       d4c_syntree_array a = new();
-      void'(a.parse(raw_str, ptr, name));
+      void'(a.parse(raw_str, ptr, name, .syn_param(syn_param)));
       return a;
     end
-    else if(raw_str[ptr.p]==OPEN_MAP) begin
+    else if(raw_str[ptr.p]==syn_param.open_map) begin
       d4c_syntree_map m = new();
-      void'(m.parse(raw_str, ptr, name));
+      void'(m.parse(raw_str, ptr, name, .syn_param(syn_param)));
       return m;
     end
     else begin
       d4c_syntree_val v = new();
-      void'(v.parse(raw_str, ptr, name));
+      void'(v.parse(raw_str, ptr, name, .syn_param(syn_param)));
       return v;
     end
   endfunction:parse
 
-  function d4c_syntree_base d4c_syntree_val::parse(ref string raw_str, ref ptr_t ptr, input string name, input bit is_key=0);
+  function d4c_syntree_base d4c_syntree_val::parse(ref string raw_str, ref ptr_t ptr, input string name, input bit is_key=0, input d4c_syn_param_t syn_param=D4C_CFG_FILE_SYN);
       if(raw_str[ptr.p]=="\"") begin: quote_parse
         ptr_t str_start = ptr.clone();
         ptr_t str_end;
@@ -272,10 +300,10 @@ package d4c;
         while(raw_str[ptr.p]!=" " && 
               raw_str[ptr.p]!="\n" && 
               raw_str[ptr.p]!="\t" && 
-              raw_str[ptr.p]!=SEP0 &&
-              raw_str[ptr.p]!=SEP1 &&
-              raw_str[ptr.p]!=CLOSE_ARRAY &&
-              raw_str[ptr.p]!=CLOSE_MAP &&
+              raw_str[ptr.p]!=syn_param.sep0 &&
+              raw_str[ptr.p]!=syn_param.sep1 &&
+              raw_str[ptr.p]!=syn_param.close_array &&
+              raw_str[ptr.p]!=syn_param.close_map &&
               raw_str.len()!=ptr.p+1) begin
           ptr.inc();
         end
@@ -284,21 +312,21 @@ package d4c;
       return this;
     endfunction
 
-  function d4c_syntree_base d4c_syntree_array::parse(ref string raw_str, ref ptr_t ptr, input string name, input bit is_key=0);
+  function d4c_syntree_base d4c_syntree_array::parse(ref string raw_str, ref ptr_t ptr, input string name, input bit is_key=0, input d4c_syn_param_t syn_param=D4C_CFG_FILE_SYN);
       ptr_t start_ptr = ptr.clone();
-      if(raw_str[ptr.p]==OPEN_ARRAY) begin
+      if(raw_str[ptr.p]==syn_param.open_array) begin
         pos = ptr.clone();
         ptr.inc();
-        while(raw_str[ptr.p]!=CLOSE_ARRAY) begin
+        while(raw_str[ptr.p]!=syn_param.close_array) begin
           d4c_syntree_base next_item = new();
           d4c_syntree_base::skip_ws_cmt(raw_str, ptr);
-          next_item = next_item.parse(raw_str, ptr, name);
+          next_item = next_item.parse(raw_str, ptr, name, .syn_param(syn_param));
           
           this.val.push_back(next_item);
           d4c_syntree_base::skip_ws_cmt(raw_str, ptr);
-          if(raw_str[ptr.p]==SEP0) ptr.inc();
-          else if(raw_str[ptr.p]==CLOSE_ARRAY);
-          else `uvm_fatal(name, {"Parsing error:: Expected a `", SEP0, "` at ", ptr.to_string(), " Got `", raw_str.substr(ptr.p, ptr.p), "`"})
+          if(raw_str[ptr.p]==syn_param.sep0) ptr.inc();
+          else if(raw_str[ptr.p]==syn_param.close_array);
+          else `uvm_fatal(name, {"Parsing error:: Expected a `", syn_param.sep0, "` at ", ptr.to_string(), " Got `", raw_str.substr(ptr.p, ptr.p), "`"})
           d4c_syntree_base::skip_ws_cmt(raw_str, ptr);
 
         end
@@ -309,24 +337,24 @@ package d4c;
       return this;
     endfunction
 
-  function d4c_syntree_base d4c_syntree_map::parse(ref string raw_str, ref ptr_t ptr, input string name, input bit is_key=0);
-    if(raw_str[ptr.p]==OPEN_MAP) begin
+  function d4c_syntree_base d4c_syntree_map::parse(ref string raw_str, ref ptr_t ptr, input string name, input bit is_key=0, input d4c_syn_param_t syn_param=D4C_CFG_FILE_SYN);
+    if(raw_str[ptr.p]==syn_param.open_map) begin
       pos = ptr.clone();
       ptr.inc();
-      while(raw_str[ptr.p]!=CLOSE_MAP) begin
+      while(raw_str[ptr.p]!=syn_param.close_map) begin
         d4c_syntree_val key = new(); //The key will be parsed by a `Map` type
         d4c_syntree_base val = new(); // The `Value` will be parsed as arbitrary D4C type
         d4c_syntree_base::skip_ws_cmt(raw_str, ptr);
-        $cast(key, key.parse(raw_str, ptr, name, .is_key(1))); //parse the key as, well key; i.e. seperator in concern is SEP1
+        $cast(key, key.parse(raw_str, ptr, name, .is_key(1), .syn_param(syn_param))); //parse the key as, well key; i.e. seperator in concern is SEP1
         d4c_syntree_base::skip_ws_cmt(raw_str, ptr);
-        if(raw_str[ptr.p]==SEP1) ptr.inc();
-        else `uvm_fatal(name, {"Parsing error:: Expected a `", SEP1, "` at ", ptr.to_string(), " Got `", raw_str.substr(ptr.p, ptr.p), "`"})
+        if(raw_str[ptr.p]==syn_param.sep1) ptr.inc();
+        else `uvm_fatal(name, {"Parsing error:: Expected a `", syn_param.sep1, "` at ", ptr.to_string(), " Got `", raw_str.substr(ptr.p, ptr.p), "`"})
         d4c_syntree_base::skip_ws_cmt(raw_str, ptr);
-        val = val.parse(raw_str, ptr, name); //Get the value now
+        val = val.parse(raw_str, ptr, name, .syn_param(syn_param)); //Get the value now
         d4c_syntree_base::skip_ws_cmt(raw_str, ptr);
-        if(raw_str[ptr.p]==SEP0) ptr.inc();
-        else if(raw_str[ptr.p]==CLOSE_MAP) ;
-        else `uvm_fatal(name, {"Parsing error:: Expected a `", SEP0, "` at ", ptr.to_string(), " Got `", raw_str.substr(ptr.p, ptr.p), "`"})
+        if(raw_str[ptr.p]==syn_param.sep0) ptr.inc();
+        else if(raw_str[ptr.p]==syn_param.close_map) ;
+        else `uvm_fatal(name, {"Parsing error:: Expected a `", syn_param.sep0, "` at ", ptr.to_string(), " Got `", raw_str.substr(ptr.p, ptr.p), "`"})
 
         this.val[key.val] = '{key, val};
         d4c_syntree_base::skip_ws_cmt(raw_str, ptr);
@@ -338,22 +366,31 @@ package d4c;
     return this;
   endfunction: parse
 
+  ///////////////////////////////////////////////////////////////////////
+
+  //the classes below are the actual user code
+
+
+  //Base class for all other datatype
+  //This class can't be instantiated
+  //this is an "abstract" class
   virtual class d4c_base extends uvm_object;
     function new(string name);
       super.new(name);
     endfunction
 
-    virtual function void parse(ref string raw_str);
+    virtual function void parse(ref string raw_str, input d4c_syn_param_t syn_param=D4C_CFG_FILE_SYN);
       d4c_syntree_base n = new();
       ptr_t p = new();
-      n = n.parse(raw_str, p, "temp_d4c_syn_tree");
+      n = n.parse(raw_str, p, "temp_d4c_syn_tree", .syn_param(syn_param));
       parse_from_syntree(n);
     endfunction: parse
 
-    pure virtual function void parse_from_syntree(d4c_syntree_base node);
+    pure virtual function void parse_from_syntree(d4c_syntree_base node, input d4c_syn_param_t syn_param=D4C_CFG_FILE_SYN);
     pure virtual function string to_string(int indent=0);
   endclass: d4c_base
   
+  // Wrapper for Integet types. T can be any in type, signed, unsigned or bit
   class d4c_int#(type T=int) extends d4c_base;
 
     T val;
@@ -361,7 +398,7 @@ package d4c;
       super.new(name);
     endfunction
 
-    virtual function void parse_from_syntree(d4c_syntree_base node);
+    virtual function void parse_from_syntree(d4c_syntree_base node, input d4c_syn_param_t syn_param=D4C_CFG_FILE_SYN);
       if(node.ty != VAL) begin
         `uvm_fatal(get_name(), $psprintf("Expected an Integer value at %s", node.pos.to_string()))
       end
@@ -387,6 +424,7 @@ package d4c;
 
   endclass: d4c_int
 
+  // Wrapper class for real/float type
   class d4c_real extends d4c_base;
     real val;
     
@@ -394,7 +432,7 @@ package d4c;
       super.new(name);
     endfunction
 
-    virtual function void parse_from_syntree(d4c_syntree_base node);
+    virtual function void parse_from_syntree(d4c_syntree_base node, input d4c_syn_param_t syn_param=D4C_CFG_FILE_SYN);
       if(node.ty != VAL) begin
         `uvm_fatal(get_name(), $psprintf("Expected an real value at %s", node.pos.to_string()))
       end
@@ -412,6 +450,7 @@ package d4c;
 
   endclass: d4c_real
 
+  // wrapper for string type
   class d4c_string extends d4c_base;
     string val;
 
@@ -419,7 +458,7 @@ package d4c;
       super.new(name);
     endfunction
 
-    virtual function void parse_from_syntree(d4c_syntree_base node);
+    virtual function void parse_from_syntree(d4c_syntree_base node, input d4c_syn_param_t syn_param=D4C_CFG_FILE_SYN);
       if(node.ty != VAL) begin
         `uvm_fatal(get_name(), $psprintf("Expected a string value at %s", node.pos.to_string()))
       end
@@ -437,6 +476,7 @@ package d4c;
 
   endclass: d4c_string
   
+  // Array type; T here can be any of d4c types that inherit d4c_base
   class d4c_array#(type T=d4c_int#(int)) extends d4c_base;
     T val[$];
 
@@ -444,13 +484,13 @@ package d4c;
       super.new(name);
     endfunction
     
-    virtual function void parse_from_syntree(d4c_syntree_base node);
+    virtual function void parse_from_syntree(d4c_syntree_base node, input d4c_syn_param_t syn_param=D4C_CFG_FILE_SYN);
       if(node.ty == ARRAY) begin
         d4c_syntree_array node_a;
         $cast(node_a, node);
         foreach(node_a.val[i]) begin
           T v = new($psprintf("%s_val_%0d", get_name(), i));
-          v.parse_from_syntree(node_a.val[i]);
+          v.parse_from_syntree(node_a.val[i], .syn_param(syn_param));
           this.val.push_back(v);
         end
       end
@@ -470,6 +510,8 @@ package d4c;
   endclass: d4c_array
   
   
+  // Map with integer keys; VAL here can be any of d4c types that inherit d4c_base
+  // KEY can be any integer type
   class d4c_int_map#(type KEY=int, VAL=d4c_int#(int)) extends d4c_base;
     VAL val[KEY];
 
@@ -477,15 +519,15 @@ package d4c;
       super.new(name);
     endfunction
 
-    virtual function void parse_from_syntree(d4c_syntree_base node);
+    virtual function void parse_from_syntree(d4c_syntree_base node, input d4c_syn_param_t syn_param=D4C_CFG_FILE_SYN);
       if(node.ty == MAP) begin
         d4c_syntree_map node_map;
         $cast(node_map, node);
         foreach(node_map.val[i]) begin
           VAL v = new($psprintf("%s[%0d]", get_name(), i));
           d4c_int#(KEY) temp_key_val = new("temp_key_val");
-          temp_key_val.parse_from_syntree(node_map.val[i].k);
-          v.parse_from_syntree(node_map.val[i].v);
+          temp_key_val.parse_from_syntree(node_map.val[i].k, .syn_param(syn_param));
+          v.parse_from_syntree(node_map.val[i].v, .syn_param(syn_param));
           this.val[temp_key_val.val] =  v;
         end
       end
@@ -506,6 +548,7 @@ package d4c;
 
   endclass: d4c_int_map
   
+  // Map with string keys; VAL here can be any of d4c types that inherit d4c_base
   class d4c_str_map#(type VAL=d4c_int#(int)) extends d4c_base;
     VAL val[string];
 
@@ -513,15 +556,15 @@ package d4c;
       super.new(name);
     endfunction
     
-    virtual function void parse_from_syntree(d4c_syntree_base node);
+    virtual function void parse_from_syntree(d4c_syntree_base node, input d4c_syn_param_t syn_param=D4C_CFG_FILE_SYN);
       if(node.ty == MAP) begin
         d4c_syntree_map node_map;
         $cast(node_map, node);
         foreach(node_map.val[i]) begin
           VAL v =new($psprintf("%s[%0d]", get_name(), i));
           d4c_string temp_key_val = new("temp_key_val");
-          temp_key_val.parse_from_syntree(node_map.val[i].k);
-          v.parse_from_syntree(node_map.val[i].v);
+          temp_key_val.parse_from_syntree(node_map.val[i].k, .syn_param(syn_param));
+          v.parse_from_syntree(node_map.val[i].v, .syn_param(syn_param));
           this.val[temp_key_val.val] =  v;
         end
       end
@@ -541,6 +584,8 @@ package d4c;
 
   endclass: d4c_str_map
 
+  // this is also not useful outside this package. It is a "string builder"
+  // class, useful in our custom class generator macros
   class d4c_stringer;
     d4c_base params[string];
 
