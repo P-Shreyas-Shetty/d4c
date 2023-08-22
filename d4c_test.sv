@@ -8,10 +8,10 @@ import d4c::*;
   /*
 {
   #supports line comment
-  "e_raten" : 0b1, #binary int
-  "e_rate"  : 100_000_000.0, #real
-  "psc_vld" : 0xff, #hexadecimal int
-  "pfe_per_oq" : {
+  "en" : 0b1, #binary int
+  "rate"  : 100_000_000.0, #real
+  "l_vld" : 0xff, #hexadecimal int
+  "foo_per_bar" : {
     0 : [0,1,2,3], #integer indices and array literal
     1 : [4,5,6,7],
     3 : [1,2,3,4],
@@ -22,17 +22,17 @@ import d4c::*;
 }
 */
   class CustomClass extends d4c_base;
-    d4c_int#(bit[0:0])                         e_raten;
-    d4c_real                                   e_rate;
-    d4c_int#(bit[6:0])                         psc_vld;
-    d4c_int_map#(.VAL(d4c_array#(d4c_int#()))) pfe_per_oq;
+    d4c_int#(bit[0:0])                         en;
+    d4c_real                                   rate;
+    d4c_int#(bit[6:0])                         l_vld;
+    d4c_int_map#(.VAL(d4c_array#(d4c_int#()))) foo_per_bar;
     d4c_string                                 name;
 
     `d4c_reg_begin
-      `d4c_reg_field(e_raten)
-      `d4c_reg_field(e_rate)
-      `d4c_reg_field(psc_vld)
-      `d4c_reg_field(pfe_per_oq)
+      `d4c_reg_field(en)
+      `d4c_reg_field(rate)
+      `d4c_reg_field(l_vld)
+      `d4c_reg_field(foo_per_bar)
       `d4c_reg_field(name)
     `d4c_reg_end
   endclass
