@@ -25,6 +25,7 @@ Ex:
 ```
 
 ## Basic building blocks
+All the buildng block classes have a field `val`, whose type depends on the classes. They also come with method `to_string()` and `parse(string raw_str)`. They all satisfy a virtual class `d4c_base`.
 ### 1. Atomic types
 D4C provides wrapper for basic datatypes of integer, real and string. All the atom types have the field `val`, whose type will be same as the type they are wrapping.
 #### a. d4c_int#(T)
