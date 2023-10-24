@@ -29,7 +29,8 @@
 //       
 //======================================================================
 
-
+//defining the macros necessary to define ur own types
+//for more info, read the README file
 `define d4c_reg_begin d4c_stringer string_builder = new();                     \
         function new(string name);                                             \
           super.new(name);                                                     \
@@ -70,13 +71,19 @@ package d4c;
   import uvm_pkg::*;
 
   // defining syntax.
+  // The syntax in question contains 6 characters:
+  //  1. sep0: Seperator for list elements and dictionary values
+  //  2. sep1: Seperator for key-val pairs in dictionary
+  //  3. open_array, close_array: Open and close characters for array literals (Ex: '[' and ']')
+  //  4. open_map, close_map: Open and close character for dictionary literals
+  // For unambiguos parsing, keep them all unique
   // syntax is configrable, we can set any character 
   // as seperator or as brackets
   // I have chosen mostly  a json like syntax for cfg file
   // but these same syntax might not work exactly when used as
   // UVM set_config_string
   // I have defined two sets of syntax params, one for cfg file
-  // and one for command line friendliness. Howver, user
+  // and one for command line friendliness. However, the user
   // is free to write his own set of syntax symbols
   parameter byte SEP0 = ",";
   parameter byte SEP1 = ":";
@@ -212,7 +219,7 @@ package d4c;
     endfunction
   endclass
 
-  // D$CNodeArray: This class is used to parse an array type
+  // d4c_syntree_array: This class is used to parse an array type
   class d4c_syntree_array extends d4c_syntree_base;
     d4c_syntree_base val[$];
 
@@ -232,7 +239,7 @@ package d4c;
 
   endclass
 
-  // D$CNodeMap: This is a dictionary type
+  // d4c_syntree_map: This is a dictionary type
   class d4c_syntree_map extends d4c_syntree_base;
     struct {d4c_syntree_val k; d4c_syntree_base v;} val[string];
 
@@ -366,6 +373,25 @@ package d4c;
     return this;
   endfunction: parse
 
+  // this is also not useful outside this package. It is a "string builder"
+  // class, useful in our custom class generator macros
+  class d4c_stringer;
+    d4c_base params[string];
+
+    function string build(int indent=0);
+      string ret;
+      foreach(params[p_name]) begin
+        if(ret=="")
+          ret = {{indent{"  "}}, "{\n", {(indent+1){"  "}}, p_name, ":", params[p_name].to_string(indent+2)} ;
+        else 
+          ret = {ret, ",\n", {(indent+1){"  "}}, p_name, ":", params[p_name].to_string(indent+2)};
+      end
+      ret = {ret, "\n", {indent{"  "}}, "}"};
+      return ret;
+    endfunction
+  endclass
+
+              
   ///////////////////////////////////////////////////////////////////////
 
   //the classes below are the actual user code
@@ -583,24 +609,6 @@ package d4c;
     endfunction
 
   endclass: d4c_str_map
-
-  // this is also not useful outside this package. It is a "string builder"
-  // class, useful in our custom class generator macros
-  class d4c_stringer;
-    d4c_base params[string];
-
-    function string build(int indent=0);
-      string ret;
-      foreach(params[p_name]) begin
-        if(ret=="")
-          ret = {{indent{"  "}}, "{\n", {(indent+1){"  "}}, p_name, ":", params[p_name].to_string(indent+2)} ;
-        else 
-          ret = {ret, ",\n", {(indent+1){"  "}}, p_name, ":", params[p_name].to_string(indent+2)};
-      end
-      ret = {ret, "\n", {indent{"  "}}, "}"};
-      return ret;
-    endfunction
-  endclass
 
 endpackage: d4c 
 
